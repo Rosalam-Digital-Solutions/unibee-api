@@ -1,0 +1,5 @@
+Cancel At Trial End,Checkout Url,Create By,Create Time,Currency,Description,Disable Auto Charge,External Plan Id,Id,Internal Name,Interval Count,Interval Unit,Is Publish,Merchant Name,Metadata,Plan Amount,Plan Name,Plan Type,Product Name,Status,Time Zone,Trial Amount,Trial Demand,Trial Duration Time
+false,http://127.0.0.1:8088/hosted/checkout?planId=242&env=local,Abel_Tesfaw(sileshieabel@gmail.com),2026-04-07 23:57:10,EUR,Pro PLus,false,242,242,Pro Plus,1,month,false,,null,700,Pro Plus,MainPlan,Default,Active,UTC,0,,0
+false,http://127.0.0.1:8088/hosted/checkout?planId=241&env=local,Abel_Tesfaw(sileshieabel@gmail.com),2026-04-07 23:56:32,EUR,Pro Plan,false,,241,Pro,1,month,false,,null,600,Pro,MainPlan,Default,Active,UTC,0,,0
+false,http://127.0.0.1:8088/hosted/checkout?planId=239&env=local,Abel_Tesfaw(sileshieabel@gmail.com),2026-04-07 11:17:15,USD,Basic Entry Plan,false,,239,Basic,1,month,false,,null,500,Basic,MainPlan,Default,Active,UTC,0,,604800
+false,http://127.0.0.1:8088/hosted/checkout?planId=240&env=local,,2026-04-07 11:18:07,USD,Basic Entry Plan,true,,240,Basic,1,month,false,,null,500,Basic(Copy),MainPlan,Default,HardArchive,UTC,0,,604800

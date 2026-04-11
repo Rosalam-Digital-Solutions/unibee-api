@@ -160,3 +160,26 @@ type DeleteReq struct {
 }
 type DeleteRes struct {
 }
+
+type ActivePriceChangePreviewReq struct {
+	g.Meta    `path:"/active_price_change/preview" tags:"Plan" method:"post" summary:"Preview Active Plan Price Change"`
+	PlanId    uint64 `json:"planId" dc:"Id of active plan" v:"required"`
+	NewAmount int64  `json:"newAmount" dc:"New amount in smallest currency unit" v:"required"`
+}
+
+type ActivePriceChangePreviewRes struct {
+	ActiveAffectedSubscriptions int `json:"activeAffectedSubscriptions" dc:"Active subscriptions on this plan"`
+	TotalAffectedSubscriptions  int `json:"totalAffectedSubscriptions" dc:"Pending/processing/active/incomplete subscriptions on this plan"`
+}
+
+type ActivePriceChangeConfirmReq struct {
+	g.Meta           `path:"/active_price_change/confirm" tags:"Plan" method:"post" summary:"Confirm Active Plan Price Change"`
+	PlanId           uint64  `json:"planId" dc:"Id of active plan" v:"required"`
+	NewAmount        int64   `json:"newAmount" dc:"New amount in smallest currency unit" v:"required"`
+	ConfirmOldAmount int64   `json:"confirmOldAmount" dc:"Current amount expected by caller" v:"required"`
+	Reason           *string `json:"reason" dc:"Optional reason for price change"`
+}
+
+type ActivePriceChangeConfirmRes struct {
+	Plan *bean.Plan `json:"plan" dc:"Updated plan"`
+}

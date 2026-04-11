@@ -47,6 +47,8 @@ type GetRes struct {
 	OpenAPIHost                  string                              `json:"openApiHost" description:"OpenApi Host"`
 	OpenAPIKey                   string                              `json:"openApiKey" description:"OpenAPIKey" `
 	SendGridKey                  string                              `json:"sendGridKey" description:"SendGridKey" `
+	DefaultEmailGateway          string                              `json:"defaultEmailGateway" description:"DefaultEmailGateway" `
+	EmailGateways                map[string]interface{}              `json:"emailGateways" description:"EmailGateways" `
 	VatSenseKey                  string                              `json:"vatSenseKey" description:"VatSenseKey" `
 	EmailSender                  *bean.Sender                        `json:"emailSender" description:"EmailSender" `
 	SegmentServerSideKey         string                              `json:"segmentServerSideKey" description:"SegmentServerSideKey" `

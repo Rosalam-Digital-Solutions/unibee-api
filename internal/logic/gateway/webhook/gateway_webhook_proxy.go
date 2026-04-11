@@ -19,6 +19,7 @@ import (
 
 var GatewayWebhookNameMapping = map[string]_interface.GatewayWebhookInterface{
 	"stripe":          &StripeWebhook{},
+	"chapa":           &ChapaWebhook{},
 	"changelly":       &ChangellyWebhook{},
 	"paypal":          &PaypalWebhook{},
 	"invalid":         &InvalidWebhook{},

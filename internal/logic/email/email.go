@@ -57,7 +57,7 @@ const (
 
 const (
 	KeyMerchantEmailName   = "KEY_MERCHANT_DEFAULT_EMAIL_NAME"
-	IMPLEMENT_NAMES        = "sendgrid"
+	IMPLEMENT_NAMES        = "sendgrid,smtp"
 	KeyMerchantEmailSender = "KEY_MERCHANT_EMAIL_SENDER"
 )
 
@@ -82,7 +82,7 @@ func GetDefaultMerchantEmailConfigWithClusterCloud(ctx context.Context, merchant
 	if valueConfig != nil {
 		data = valueConfig.ConfigValue
 	}
-	if config.GetConfigInstance().Mode == "cloud" && len(data) == 0 {
+	if config.GetConfigInstance().Mode == "cloud" && len(data) == 0 && (len(name) == 0 || strings.EqualFold(name, "sendgrid")) {
 		data, _ = getDefaultMerchantEmailConfigFromClusterCloud(ctx, merchantId)
 	}
 	return
@@ -155,8 +155,45 @@ func SetupMerchantEmailSender(ctx context.Context, merchantId uint64, sender *se
 }
 
 func SetupMerchantEmailConfig(ctx context.Context, merchantId uint64, name string, data string, isDefault bool) error {
-	utility.Assert(strings.Contains(IMPLEMENT_NAMES, name), "gateway not support, should be "+IMPLEMENT_NAMES)
-	err := update.SetMerchantConfig(ctx, merchantId, name, data)
+	name = strings.ToLower(strings.TrimSpace(name))
+	utility.Assert(name == "sendgrid" || name == "smtp", "gateway not support, should be "+IMPLEMENT_NAMES)
+	finalData := data
+	existingConfig := merchant_config.GetMerchantConfig(ctx, merchantId, name)
+	if existingConfig != nil && len(existingConfig.ConfigValue) > 0 {
+		incoming := map[string]interface{}{}
+		existing := map[string]interface{}{}
+		_ = utility.UnmarshalFromJsonString(data, &incoming)
+		_ = utility.UnmarshalFromJsonString(existingConfig.ConfigValue, &existing)
+
+		if name == "sendgrid" {
+			if incoming["apiKey"] == nil || strings.TrimSpace(fmt.Sprintf("%v", incoming["apiKey"])) == "" || strings.Contains(fmt.Sprintf("%v", incoming["apiKey"]), "*") {
+				if existing["apiKey"] != nil {
+					incoming["apiKey"] = existing["apiKey"]
+				}
+			}
+		} else if name == "smtp" {
+			for _, key := range []string{"smtpHost", "smtpPort", "username", "authType", "useTLS", "skipTLSVerify"} {
+				if incoming[key] == nil {
+					if existing[key] != nil {
+						incoming[key] = existing[key]
+					}
+				}
+			}
+			for _, secretKey := range []string{"password", "oauthToken"} {
+				if incoming[secretKey] == nil || strings.TrimSpace(fmt.Sprintf("%v", incoming[secretKey])) == "" || strings.Contains(fmt.Sprintf("%v", incoming[secretKey]), "*") {
+					if existing[secretKey] != nil {
+						incoming[secretKey] = existing[secretKey]
+					}
+				}
+			}
+		}
+
+		if len(incoming) > 0 {
+			finalData = utility.MarshalToJsonString(incoming)
+		}
+	}
+
+	err := update.SetMerchantConfig(ctx, merchantId, name, finalData)
 	if err != nil {
 		return err
 	}
@@ -234,8 +271,8 @@ func getEmailTemplateGroupVariables() []*bean.TemplateVariableGroup {
 
 func SendTemplateEmailByOpenApi(ctx context.Context, merchantId uint64, mailTo string, timezone string, language string, templateName string, pdfFilePath string, templateVariables *bean.EmailTemplateVariable, languageData *[]*bean.EmailLocalizationTemplate) (err error) {
 	mailTo = strings.ToLower(mailTo)
-	_, emailGatewayKey := GetDefaultMerchantEmailConfigWithClusterCloud(ctx, merchantId)
-	if len(emailGatewayKey) == 0 {
+	gatewayName, gatewayData := GetDefaultMerchantEmailConfigWithClusterCloud(ctx, merchantId)
+	if len(gatewayData) == 0 {
 		if strings.Compare(templateName, TemplateUserOTPLogin) == 0 || strings.Compare(templateName, TemplateUserRegistrationCodeVerify) == 0 {
 			utility.Assert(false, "Default Email Gateway Need Setup")
 		} else {
@@ -296,14 +333,15 @@ func SendTemplateEmailByOpenApi(ctx context.Context, merchantId uint64, mailTo s
 	if len(pdfFilePath) > 0 && len(attachName) == 0 {
 		attachName = fmt.Sprintf("invoice_%s", time.Now().Format("20060102"))
 	}
-	return Send(ctx, &SendgridEmailReq{
+	return Send(ctx, &SendEmailReq{
 		MerchantId:        merchantId,
 		MailTo:            mailTo,
 		Subject:           subject,
 		Content:           content,
 		LocalFilePath:     pdfFilePath,
 		AttachName:        attachName + ".pdf",
-		APIKey:            emailGatewayKey,
+		GatewayName:       gatewayName,
+		GatewayData:       gatewayData,
 		VariableMap:       variableMap,
 		Language:          language,
 		GatewayTemplateId: template.GatewayTemplateId,
@@ -313,8 +351,8 @@ func SendTemplateEmailByOpenApi(ctx context.Context, merchantId uint64, mailTo s
 // SendTemplateEmail template should convert by html tools like https://www.iamwawa.cn/text2html.html
 func SendTemplateEmail(superCtx context.Context, merchantId uint64, mailTo string, timezone string, language string, templateName string, pdfFilePath string, templateVariables *bean.EmailTemplateVariable) error {
 	mailTo = strings.ToLower(mailTo)
-	_, emailGatewayKey := GetDefaultMerchantEmailConfigWithClusterCloud(superCtx, merchantId)
-	if len(emailGatewayKey) == 0 {
+	gatewayName, gatewayData := GetDefaultMerchantEmailConfigWithClusterCloud(superCtx, merchantId)
+	if len(gatewayData) == 0 {
 		if strings.Compare(templateName, TemplateUserOTPLogin) == 0 || strings.Compare(templateName, TemplateUserRegistrationCodeVerify) == 0 {
 			utility.Assert(false, "Default Email Gateway Need Setup")
 		} else {
@@ -335,13 +373,13 @@ func SendTemplateEmail(superCtx context.Context, merchantId uint64, mailTo strin
 				return
 			}
 		}()
-		err = sendTemplateEmailInternal(backgroundCtx, merchantId, mailTo, timezone, language, templateName, pdfFilePath, templateVariables, emailGatewayKey)
+		err = sendTemplateEmailInternal(backgroundCtx, merchantId, mailTo, timezone, language, templateName, pdfFilePath, templateVariables, gatewayName, gatewayData)
 		utility.AssertError(err, "sendTemplateEmailInternal")
 	}()
 	return nil
 }
 
-func sendTemplateEmailInternal(ctx context.Context, merchantId uint64, mailTo string, timezone string, language string, templateName string, pdfFilePath string, templateVariables *bean.EmailTemplateVariable, emailGatewayKey string) error {
+func sendTemplateEmailInternal(ctx context.Context, merchantId uint64, mailTo string, timezone string, language string, templateName string, pdfFilePath string, templateVariables *bean.EmailTemplateVariable, gatewayName string, gatewayData string) error {
 	mailTo = strings.ToLower(mailTo)
 	var template *bean.MerchantEmailTemplate
 	if merchantId > 0 {
@@ -398,45 +436,67 @@ func sendTemplateEmailInternal(ctx context.Context, merchantId uint64, mailTo st
 		attachName = fmt.Sprintf("invoice_%s", time.Now().Format("20060102"))
 	}
 
-	return Send(ctx, &SendgridEmailReq{
+	gatewayTemplateId := template.GatewayTemplateId
+	if strings.EqualFold(gatewayName, "smtp") {
+		gatewayTemplateId = ""
+	}
+
+	return Send(ctx, &SendEmailReq{
 		MerchantId:        merchantId,
 		MailTo:            mailTo,
 		Subject:           subject,
 		Content:           content,
 		LocalFilePath:     pdfFilePath,
 		AttachName:        attachName + ".pdf",
-		APIKey:            emailGatewayKey,
+		GatewayName:       gatewayName,
+		GatewayData:       gatewayData,
 		VariableMap:       variableMap,
 		Language:          language,
-		GatewayTemplateId: template.GatewayTemplateId,
+		GatewayTemplateId: gatewayTemplateId,
 	})
 }
 
-type SendgridEmailReq struct {
+type SendEmailReq struct {
 	MerchantId        uint64                 `json:"merchantId"`
 	MailTo            string                 `json:"mailTo"`
 	Subject           string                 `json:"subject"`
 	Content           string                 `json:"content"`
 	LocalFilePath     string                 `json:"localFilePath"`
 	AttachName        string                 `json:"attachName"`
-	APIKey            string                 `json:"apiKey"`
+	GatewayName       string                 `json:"gatewayName"`
+	GatewayData       string                 `json:"gatewayData"`
 	VariableMap       map[string]interface{} `json:"variable_map"`
 	Language          string                 `json:"language"`
 	GatewayTemplateId string                 `json:"gatewayTemplateId"`
 }
 
-func Send(ctx context.Context, req *SendgridEmailReq) error {
+func Send(ctx context.Context, req *SendEmailReq) error {
 	var err error
 	var response string
+	gatewayName := strings.ToLower(strings.TrimSpace(req.GatewayName))
+	if len(gatewayName) == 0 {
+		gatewayName = "sendgrid"
+	}
+	if gatewayName == "sendgrid" && strings.HasPrefix(strings.TrimSpace(req.GatewayData), "{") {
+		var sendgridConfig map[string]interface{}
+		_ = utility.UnmarshalFromJsonString(req.GatewayData, &sendgridConfig)
+		if sendgridConfig["apiKey"] != nil {
+			req.GatewayData = fmt.Sprintf("%v", sendgridConfig["apiKey"])
+		}
+	}
 	if len(req.LocalFilePath) > 0 {
 		md5 := utility.MD5(fmt.Sprintf("%s%s%s%s", req.MailTo, req.Subject, req.Content, req.AttachName))
 		if !utility.TryLock(ctx, md5, 10) {
 			utility.Assert(false, "duplicate email too fast")
 		}
-		if len(req.GatewayTemplateId) > 0 {
-			response, err = gateway.SendSendgridDynamicTemplateWithAttachFileEmailToUser(GetMerchantEmailSender(ctx, req.MerchantId), req.APIKey, req.MailTo, req.Subject, req.GatewayTemplateId, req.VariableMap, req.Language, req.LocalFilePath, req.AttachName)
+		if gatewayName == "smtp" {
+			response, err = gateway.SendSmtpAttachEmailToUser(GetMerchantEmailSender(ctx, req.MerchantId), req.GatewayData, req.MailTo, req.Subject, req.Content, req.LocalFilePath, req.AttachName)
 		} else {
-			response, err = gateway.SendPdfAttachEmailToUser(GetMerchantEmailSender(ctx, req.MerchantId), req.APIKey, req.MailTo, req.Subject, req.Content, req.LocalFilePath, req.AttachName)
+			if len(req.GatewayTemplateId) > 0 {
+				response, err = gateway.SendSendgridDynamicTemplateWithAttachFileEmailToUser(GetMerchantEmailSender(ctx, req.MerchantId), req.GatewayData, req.MailTo, req.Subject, req.GatewayTemplateId, req.VariableMap, req.Language, req.LocalFilePath, req.AttachName)
+			} else {
+				response, err = gateway.SendPdfAttachEmailToUser(GetMerchantEmailSender(ctx, req.MerchantId), req.GatewayData, req.MailTo, req.Subject, req.Content, req.LocalFilePath, req.AttachName)
+			}
 		}
 		if err != nil {
 			if len(req.GatewayTemplateId) > 0 {
@@ -459,10 +519,14 @@ func Send(ctx context.Context, req *SendgridEmailReq) error {
 		if !utility.TryLock(ctx, md5, 10) {
 			utility.Assert(false, "duplicate email too fast")
 		}
-		if len(req.GatewayTemplateId) > 0 {
-			response, err = gateway.SendSendgridDynamicTemplateEmailToUser(GetMerchantEmailSender(ctx, req.MerchantId), req.APIKey, req.MailTo, req.Subject, req.GatewayTemplateId, req.VariableMap, req.Language)
+		if gatewayName == "smtp" {
+			response, err = gateway.SendSmtpEmailToUser(GetMerchantEmailSender(ctx, req.MerchantId), req.GatewayData, req.MailTo, req.Subject, req.Content)
 		} else {
-			response, err = gateway.SendEmailToUser(GetMerchantEmailSender(ctx, req.MerchantId), req.APIKey, req.MailTo, req.Subject, req.Content)
+			if len(req.GatewayTemplateId) > 0 {
+				response, err = gateway.SendSendgridDynamicTemplateEmailToUser(GetMerchantEmailSender(ctx, req.MerchantId), req.GatewayData, req.MailTo, req.Subject, req.GatewayTemplateId, req.VariableMap, req.Language)
+			} else {
+				response, err = gateway.SendEmailToUser(GetMerchantEmailSender(ctx, req.MerchantId), req.GatewayData, req.MailTo, req.Subject, req.Content)
+			}
 		}
 		if err != nil {
 			if len(req.GatewayTemplateId) > 0 {
@@ -497,7 +561,7 @@ func SaveHistory(ctx context.Context, merchantId uint64, mailTo string, title st
 		}
 	}()
 	status := 0
-	if strings.Contains(response, "202") {
+	if strings.Contains(response, "202") || strings.Contains(response, "250") || strings.Contains(strings.ToLower(response), "accepted") {
 		status = 1
 	} else {
 		status = 2

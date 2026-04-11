@@ -21,9 +21,12 @@ func SyncMerchantEmailTemplateToGateway(ctx context.Context, id int64, versionEn
 	if err != nil {
 		return err
 	}
-	_, emailGatewayKey := GetDefaultMerchantEmailConfig(ctx, one.MerchantId)
+	gatewayName, emailGatewayKey := GetDefaultMerchantEmailConfig(ctx, one.MerchantId)
 	if len(emailGatewayKey) == 0 {
 		return gerror.New("Default Email Gateway Need Setup")
+	}
+	if gatewayName == "smtp" {
+		return nil
 	}
 	content := one.TemplateContent
 	if len(one.LanguageData) == 0 {

@@ -21,6 +21,7 @@ import (
 
 var GatewayNameMapping = map[string]_interface.GatewayInterface{
 	"stripe":          &Stripe{},
+	"chapa":           &Chapa{},
 	"changelly":       &Changelly{},
 	"paypal":          &Paypal{},
 	"invalid":         &Invalid{},
@@ -45,6 +46,7 @@ var GatewayNameMapping = map[string]_interface.GatewayInterface{
 
 var GatewayShortNameMapping = map[string]string{
 	"stripe":          "ST",
+	"chapa":           "CHP",
 	"changelly":       "CT",
 	"paypal":          "PP",
 	"invalid":         "IP",
@@ -71,6 +73,7 @@ var GatewayShortNameMapping = map[string]string{
 
 var ExportGatewaySetupList = map[string]*_interface.GatewayInfo{
 	"stripe":        Stripe{}.GatewayInfo(context.Background()),
+	"chapa":         Chapa{}.GatewayInfo(context.Background()),
 	"changelly":     Changelly{}.GatewayInfo(context.Background()),
 	"paypal":        Paypal{}.GatewayInfo(context.Background()),
 	"unitpay":       UnitPay{}.GatewayInfo(context.Background()),

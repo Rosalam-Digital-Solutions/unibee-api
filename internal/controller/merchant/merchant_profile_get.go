@@ -3,6 +3,7 @@ package merchant
 import (
 	"context"
 	"fmt"
+	"strings"
 	"unibee/api/bean"
 	"unibee/api/bean/detail"
 	"unibee/api/merchant/profile"
@@ -42,7 +43,34 @@ func (c *ControllerProfile) Get(ctx context.Context, req *profile.GetReq) (res *
 	if vatGatewayName != "vatsense" {
 		vatGatewayKey = ""
 	}
-	_, emailData := email.GetDefaultMerchantEmailConfig(ctx, merchant.Id)
+	defaultEmailGateway, emailData := email.GetDefaultMerchantEmailConfig(ctx, merchant.Id)
+	emailGateways := map[string]interface{}{}
+	for _, gatewayName := range []string{"sendgrid", "smtp"} {
+		cfg := merchant_config.GetMerchantConfig(ctx, merchant.Id, gatewayName)
+		if cfg == nil || len(cfg.ConfigValue) == 0 {
+			continue
+		}
+		gatewayConfig := map[string]interface{}{}
+		if gatewayName == "sendgrid" {
+			if strings.HasPrefix(strings.TrimSpace(cfg.ConfigValue), "{") {
+				_ = utility.UnmarshalFromJsonString(cfg.ConfigValue, &gatewayConfig)
+				if gatewayConfig["apiKey"] != nil {
+					gatewayConfig["apiKey"] = utility.HideStar(fmt.Sprintf("%v", gatewayConfig["apiKey"]))
+				}
+			} else {
+				gatewayConfig["apiKey"] = utility.HideStar(cfg.ConfigValue)
+			}
+		} else {
+			_ = utility.UnmarshalFromJsonString(cfg.ConfigValue, &gatewayConfig)
+			if gatewayConfig["password"] != nil {
+				gatewayConfig["password"] = utility.HideStar(fmt.Sprintf("%v", gatewayConfig["password"]))
+			}
+			if gatewayConfig["oauthToken"] != nil {
+				gatewayConfig["oauthToken"] = utility.HideStar(fmt.Sprintf("%v", gatewayConfig["oauthToken"]))
+			}
+		}
+		emailGateways[gatewayName] = gatewayConfig
+	}
 	var emailSender *bean.Sender
 	one := email.GetMerchantEmailSender(ctx, _interface.GetMerchantId(ctx))
 	if one != nil {
@@ -104,6 +132,8 @@ func (c *ControllerProfile) Get(ctx context.Context, req *profile.GetReq) (res *
 		OpenAPIHost:                  config.GetConfigInstance().Server.GetServerPath(),
 		OpenAPIKey:                   apikey,
 		SendGridKey:                  utility.HideStar(emailData),
+		DefaultEmailGateway:          defaultEmailGateway,
+		EmailGateways:                emailGateways,
 		EmailSender:                  emailSender,
 		VatSenseKey:                  utility.HideStar(vatGatewayKey),
 		SegmentServerSideKey:         segment.GetMerchantSegmentServerSideConfig(ctx, merchant.Id),

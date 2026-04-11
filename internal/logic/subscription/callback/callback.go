@@ -126,7 +126,10 @@ func (s SubscriptionPaymentCallback) PaymentSuccessCallback(ctx context.Context,
 				}
 			} else if strings.Compare(sub.LatestInvoiceId, invoice.InvoiceId) == 0 ||
 				(gateway.GatewayType == consts.GatewayTypeCrypto && strings.Compare(payment.BillingReason, "SubscriptionRenew") == 0) ||
-				(gateway.GatewayType == consts.GatewayTypeCrypto && strings.Compare(payment.BillingReason, "SubscriptionCycle") == 0) {
+				(gateway.GatewayType == consts.GatewayTypeCrypto && strings.Compare(payment.BillingReason, "SubscriptionCycle") == 0) ||
+				(strings.EqualFold(gateway.GatewayName, "chapa") &&
+					(strings.Compare(payment.BillingReason, "SubscriptionRenew") == 0 ||
+						strings.Compare(payment.BillingReason, "SubscriptionCycle") == 0)) {
 				// SubscriptionCycle or SubscriptionRenew
 				err := handler.HandleSubscriptionNextBillingCyclePaymentSuccess(ctx, sub, invoice)
 				if err != nil {

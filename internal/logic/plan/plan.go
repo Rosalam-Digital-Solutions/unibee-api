@@ -112,6 +112,94 @@ type PlanInternalReq struct {
 	MultiCurrencies       []*bean.PlanMultiCurrency            `json:"multiCurrencies"  dc:"Plan's MultiCurrencies" `
 }
 
+type ActivePriceChangePreview struct {
+	ActiveAffectedSubscriptions int `json:"activeAffectedSubscriptions"`
+	TotalAffectedSubscriptions  int `json:"totalAffectedSubscriptions"`
+}
+
+func ActivePlanPriceChangePreview(ctx context.Context, merchantId uint64, planId uint64, newAmount int64) (*ActivePriceChangePreview, error) {
+	utility.Assert(planId > 0, "invalid planId")
+	utility.Assert(newAmount >= 0, "Amount value should >= 0")
+
+	one := query.GetPlanById(ctx, planId)
+	utility.Assert(one != nil, fmt.Sprintf("plan not found, id:%d", planId))
+	utility.Assert(one.MerchantId == merchantId, "Merchant not match")
+	utility.Assert(one.Status == consts.PlanStatusActive, "plan not activate")
+
+	activeAffectedSubscriptions, err := dao.Subscription.Ctx(ctx).
+		Where(dao.Subscription.Columns().MerchantId, merchantId).
+		Where(dao.Subscription.Columns().PlanId, planId).
+		Where(dao.Subscription.Columns().IsDeleted, 0).
+		Where(dao.Subscription.Columns().Status, consts.SubStatusActive).
+		Count()
+	if err != nil {
+		return nil, err
+	}
+
+	totalAffectedSubscriptions, err := dao.Subscription.Ctx(ctx).
+		Where(dao.Subscription.Columns().MerchantId, merchantId).
+		Where(dao.Subscription.Columns().PlanId, planId).
+		Where(dao.Subscription.Columns().IsDeleted, 0).
+		WhereIn(dao.Subscription.Columns().Status, []int{
+			consts.SubStatusPending,
+			consts.SubStatusProcessing,
+			consts.SubStatusActive,
+			consts.SubStatusIncomplete,
+		}).
+		Count()
+	if err != nil {
+		return nil, err
+	}
+
+	return &ActivePriceChangePreview{
+		ActiveAffectedSubscriptions: activeAffectedSubscriptions,
+		TotalAffectedSubscriptions:  totalAffectedSubscriptions,
+	}, nil
+}
+
+func ActivePlanPriceChangeConfirm(ctx context.Context, merchantId uint64, planId uint64, newAmount int64, confirmOldAmount int64, reason *string) (*entity.Plan, error) {
+	utility.Assert(planId > 0, "invalid planId")
+	utility.Assert(newAmount >= 0, "Amount value should >= 0")
+
+	one := query.GetPlanById(ctx, planId)
+	utility.Assert(one != nil, fmt.Sprintf("plan not found, id:%d", planId))
+	utility.Assert(one.MerchantId == merchantId, "Merchant not match")
+	utility.Assert(one.Status == consts.PlanStatusActive, "plan not activate")
+	utility.Assert(one.Type == consts.PlanTypeMain, "only main plans support active price change")
+	utility.Assert(one.Amount == confirmOldAmount, fmt.Sprintf("plan amount changed, expected %d actual %d", confirmOldAmount, one.Amount))
+
+	if one.Amount == newAmount {
+		return one, nil
+	}
+
+	updateData := g.Map{
+		dao.Plan.Columns().Amount:        newAmount,
+		dao.Plan.Columns().PublishStatus: consts.PlanPublishStatusUnPublished,
+		dao.Plan.Columns().GmtModify:     gtime.Now(),
+	}
+	_, err := dao.Plan.Ctx(ctx).Data(updateData).Where(dao.Plan.Columns().Id, planId).Update()
+	if err != nil {
+		return nil, err
+	}
+
+	logContent := fmt.Sprintf("ActivePriceChange(%d->%d)", one.Amount, newAmount)
+	if reason != nil && len(strings.TrimSpace(*reason)) > 0 {
+		logContent = fmt.Sprintf("%s reason:%s", logContent, strings.TrimSpace(*reason))
+	}
+	operation_log.AppendOptLog(ctx, &operation_log.OptLogRequest{
+		MerchantId:     one.MerchantId,
+		Target:         fmt.Sprintf("Plan(%v)", one.Id),
+		Content:        logContent,
+		UserId:         0,
+		SubscriptionId: "",
+		InvoiceId:      "",
+		PlanId:         one.Id,
+		DiscountCode:   "",
+	}, err)
+
+	return query.GetPlanById(ctx, planId), nil
+}
+
 func MetricPlanChargeValidation(metricPlanCharges []*bean.PlanMetricMeteredChargeParam) error {
 	for _, metricPlanCharge := range metricPlanCharges {
 		if metricPlanCharge.MetricId <= 0 {

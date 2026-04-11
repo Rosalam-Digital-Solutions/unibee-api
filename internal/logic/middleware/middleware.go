@@ -287,11 +287,6 @@ func (s *SMiddleware) UserPortalMerchantRouterHandler(r *ghttp.Request) {
 		r.Middleware.Next()
 		return
 	} else {
-		if config.GetConfigInstance().IsServerDev() || config.GetConfigInstance().IsLocal() {
-			customCtx.MerchantId = consts.CloudModeManagerMerchantId
-			r.Middleware.Next()
-			return
-		}
 		host := r.GetHost()
 		if !config.GetConfigInstance().IsProd() && (host == "127.0.0.1" || host == "localhost") {
 			host = "user.unibee.top"
@@ -323,6 +318,11 @@ func (s *SMiddleware) UserPortalMerchantRouterHandler(r *ghttp.Request) {
 			}
 		}
 		if one == nil {
+			if config.GetConfigInstance().IsServerDev() || config.GetConfigInstance().IsLocal() {
+				customCtx.MerchantId = consts.CloudModeManagerMerchantId
+				r.Middleware.Next()
+				return
+			}
 			g.Log().Infof(r.Context(), "UserPortalMerchantRouterHandler Merchant Not Found For Host:%s", r.GetHost())
 			_interface.JsonRedirectExit(r, 61, "Merchant Not Ready", s.LoginUrl)
 			r.Exit()

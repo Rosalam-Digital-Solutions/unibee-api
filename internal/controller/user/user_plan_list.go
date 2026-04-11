@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"github.com/gogf/gf/v2/frame/g"
 	"unibee/api/user/plan"
 	"unibee/internal/cmd/config"
 	"unibee/internal/consts"
@@ -43,5 +44,13 @@ func (c *ControllerPlan) List(ctx context.Context, req *plan.ListReq) (res *plan
 			}
 		}
 	}
+	g.Log().Infof(ctx, "UserPlanList merchantId:%d userId:%d productIds:%v type:%v returnedPlans:%d total:%d",
+		_interface.GetMerchantId(ctx),
+		_interface.Context().Get(ctx).User.Id,
+		req.ProductIds,
+		req.Type,
+		len(publishPlans),
+		total,
+	)
 	return &plan.ListRes{Plans: publishPlans, Total: total}, nil
 }
