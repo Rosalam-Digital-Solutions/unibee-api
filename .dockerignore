@@ -1,0 +1,11 @@
+.git
+.github
+.vscode
+.idea
+*.log
+*.tmp
+tmp/
+temp/
+test/
+embedded/node_modules/
+embedded/build/
