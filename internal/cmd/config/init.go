@@ -101,6 +101,17 @@ func Init() {
 	// Parse Params
 	flag.Parse()
 
+	// Compatibility fallback for platforms that only provide PORT.
+	if serverAddress == "" {
+		if port := strings.TrimSpace(utility.GetEnvParam("PORT")); port != "" {
+			if strings.HasPrefix(port, ":") {
+				serverAddress = port
+			} else {
+				serverAddress = ":" + port
+			}
+		}
+	}
+
 	// Normalize accidental key=value style values copied into env variable fields.
 	databaseLink = strings.TrimSpace(databaseLink)
 	databaseLink = strings.TrimPrefix(databaseLink, "DATABASE_LINK=")
