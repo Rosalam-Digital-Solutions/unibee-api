@@ -101,14 +101,42 @@ func Init() {
 	// Parse Params
 	flag.Parse()
 
+	// Normalize accidental key=value style values copied into env variable fields.
+	databaseLink = strings.TrimSpace(databaseLink)
+	databaseLink = strings.TrimPrefix(databaseLink, "DATABASE_LINK=")
+	databaseLink = strings.TrimPrefix(databaseLink, "MYSQL_URL=")
+	if strings.HasPrefix(strings.ToLower(databaseLink), "mysql://") {
+		databaseLink = parseMySQLURLToGFLink(databaseLink)
+	}
+
+	redisAddress = strings.TrimSpace(redisAddress)
+	redisAddress = strings.TrimPrefix(redisAddress, "REDIS_ADDRESS=")
+	redisAddress = strings.TrimPrefix(redisAddress, "REDIS_URL=")
+	if strings.HasPrefix(strings.ToLower(redisAddress), "redis://") || strings.HasPrefix(strings.ToLower(redisAddress), "rediss://") {
+		addr, pass, db := parseRedisURL(redisAddress)
+		if redisAddress == "" || strings.HasPrefix(strings.ToLower(redisAddress), "redis://") || strings.HasPrefix(strings.ToLower(redisAddress), "rediss://") {
+			redisAddress = addr
+		}
+		if redisPass == "" {
+			redisPass = pass
+		}
+		if redisDatabase == "" {
+			redisDatabase = db
+		}
+	}
+
 	// Compatibility fallback for platforms that inject DSN URLs.
 	if databaseLink == "" {
 		if mysqlURL := utility.GetEnvParam("MYSQL_URL"); mysqlURL != "" {
+			mysqlURL = strings.TrimSpace(mysqlURL)
+			mysqlURL = strings.TrimPrefix(mysqlURL, "MYSQL_URL=")
 			databaseLink = parseMySQLURLToGFLink(mysqlURL)
 		}
 	}
 	if redisAddress == "" || redisPass == "" {
 		if redisURL := utility.GetEnvParam("REDIS_URL"); redisURL != "" {
+			redisURL = strings.TrimSpace(redisURL)
+			redisURL = strings.TrimPrefix(redisURL, "REDIS_URL=")
 			addr, pass, db := parseRedisURL(redisURL)
 			if redisAddress == "" {
 				redisAddress = addr
