@@ -36,7 +36,11 @@ Important behavior:
 
 ## Recommended Environment Variables
 
-Set either `DATABASE_LINK` directly, or `DB_HOST` and related parts.
+Set database/redis using one of these options:
+
+- Option A (easiest): `MYSQL_URL` and `REDIS_URL`
+- Option B: `DATABASE_LINK` and `REDIS_ADDRESS` style vars
+- Option C: split `DB_*` and `REDIS_*` vars
 
 For a full starting template, copy values from `.env.coolify.example` into your Coolify Environment Variables page.
 
@@ -47,6 +51,16 @@ For a full starting template, copy values from `.env.coolify.example` into your 
 - `UNIBEE_API_URL=https://your-api-domain`
 - `SERVER_ADDRESS=:8088`
 - `SERVER_JWT_KEY=<strong-random-secret>`
+
+### MySQL + Redis URL Style (Option A)
+
+- `MYSQL_URL=mysql://USER:PASSWORD@HOST:3306/DBNAME`
+- `REDIS_URL=redis://default:PASSWORD@HOST:6379/0`
+
+Example from your current deployment values:
+
+- `MYSQL_URL=mysql://mysql:***@gjh90y0omxsd0p5mgfhxupse:3306/default`
+- `REDIS_URL=redis://default:***@gn38rbu6g7ac5lo4fhwgaxph:6379/0`
 
 ### MySQL (Option A: full link)
 

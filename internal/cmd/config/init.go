@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -34,6 +35,7 @@ var (
 	redisMinIdle                     string
 	redisIdleTimeout                 string
 	databaseLink                     string
+	databaseType                     string
 	databaseDebug                    string
 	databaseCharset                  string
 	authLoginExpire                  *int64
@@ -69,6 +71,7 @@ func Init() {
 	flag.StringVar(&redisMinIdle, "redis-minIdle", utility.GetEnvParam("redis.minIdle"), "redis minIdle, default 10")
 	flag.StringVar(&redisIdleTimeout, "redis-idleTimeout", utility.GetEnvParam("redis.idleTimeout"), "redis idleTimeout, default 1d")
 	flag.StringVar(&databaseLink, "database-link", utility.GetEnvParam("database.link"), "database link, require")
+	flag.StringVar(&databaseType, "database-type", utility.GetEnvParam("database.type"), "database type, default mysql")
 	flag.StringVar(&databaseDebug, "database-debug", utility.GetEnvParam("database.debug"), "database debug, default false")
 	flag.StringVar(&databaseCharset, "database-charset", utility.GetEnvParam("database.charset"), "database charset, default utf8mb4")
 	flag.StringVar(&loggerLevel, "logger-level", utility.GetEnvParam("logger.level"), "logger level, default all")
@@ -97,6 +100,31 @@ func Init() {
 
 	// Parse Params
 	flag.Parse()
+
+	// Compatibility fallback for platforms that inject DSN URLs.
+	if databaseLink == "" {
+		if mysqlURL := utility.GetEnvParam("MYSQL_URL"); mysqlURL != "" {
+			databaseLink = parseMySQLURLToGFLink(mysqlURL)
+		}
+	}
+	if redisAddress == "" || redisPass == "" {
+		if redisURL := utility.GetEnvParam("REDIS_URL"); redisURL != "" {
+			addr, pass, db := parseRedisURL(redisURL)
+			if redisAddress == "" {
+				redisAddress = addr
+			}
+			if redisPass == "" {
+				redisPass = pass
+			}
+			if redisDatabase == "" && db != "" {
+				redisDatabase = db
+			}
+		}
+	}
+	if databaseType == "" {
+		databaseType = inferDatabaseType(databaseLink)
+	}
+
 	if len(nacosIpArg) > 0 {
 		_ = deleteFile(DefaultConfigFileName) //delete old config file
 		uPort, err := strconv.ParseUint(nacosPortArg, 10, 64)
@@ -197,6 +225,7 @@ func SetupDefaultConfigs(ctx context.Context) {
 	databaseConfig := g.Cfg().MustGet(ctx, "database.default").Map()
 	utility.Assert(databaseConfig != nil, "database config not found")
 	setUpDefaultConfig(databaseConfig, "link", databaseLink, nil)
+	setUpDefaultConfig(databaseConfig, "type", databaseType, inferDatabaseType(databaseLink))
 	setUpDefaultConfig(databaseConfig, "debug", databaseDebug, false)
 	setUpDefaultConfig(databaseConfig, "charset", databaseCharset, "utf8mb4")
 	loggerConfig := g.Cfg().MustGet(ctx, "logger").Map()
@@ -301,4 +330,70 @@ func setUpDefaultConfig(config map[string]interface{}, key string, flagValue int
 			config[key] = defaultValue
 		}
 	}
+}
+
+func inferDatabaseType(link string) string {
+	l := strings.ToLower(link)
+	if strings.HasPrefix(l, "postgres://") || strings.HasPrefix(l, "postgresql://") || strings.Contains(l, "@tcp(") == false && strings.Contains(l, "host=") {
+		return "pgsql"
+	}
+	return "mysql"
+}
+
+func parseMySQLURLToGFLink(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u == nil {
+		return raw
+	}
+	if u.Scheme != "mysql" {
+		return raw
+	}
+
+	user := ""
+	pass := ""
+	if u.User != nil {
+		user = u.User.Username()
+		pass, _ = u.User.Password()
+	}
+	host := u.Hostname()
+	port := u.Port()
+	if port == "" {
+		port = "3306"
+	}
+	db := strings.TrimPrefix(u.Path, "/")
+
+	gf := fmt.Sprintf("mysql:%s:%s@tcp(%s:%s)/%s", user, pass, host, port, db)
+	if q := u.RawQuery; q != "" {
+		gf = gf + "?" + q
+	}
+	return gf
+}
+
+func parseRedisURL(raw string) (address string, password string, db string) {
+	u, err := url.Parse(raw)
+	if err != nil || u == nil {
+		return "", "", ""
+	}
+	if u.Scheme != "redis" && u.Scheme != "rediss" {
+		return "", "", ""
+	}
+
+	host := u.Hostname()
+	port := u.Port()
+	if host != "" {
+		if port == "" {
+			port = "6379"
+		}
+		address = host + ":" + port
+	}
+
+	if u.User != nil {
+		password, _ = u.User.Password()
+	}
+
+	if u.Path != "" && u.Path != "/" {
+		db = strings.TrimPrefix(u.Path, "/")
+	}
+
+	return address, password, db
 }

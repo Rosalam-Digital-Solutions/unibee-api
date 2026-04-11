@@ -32,6 +32,30 @@ fi
 
 if [ -n "${DATABASE_LINK:-}" ]; then
     set -- "$@" "--database-link=${DATABASE_LINK}"
+elif [ -n "${MYSQL_URL:-}" ]; then
+    MYSQL_TMP="${MYSQL_URL#mysql://}"
+    MYSQL_CREDS="${MYSQL_TMP%@*}"
+    MYSQL_HOSTDB="${MYSQL_TMP#*@}"
+
+    MYSQL_USER="${MYSQL_CREDS%%:*}"
+    MYSQL_PASSWORD="${MYSQL_CREDS#*:}"
+
+    MYSQL_HOSTPORT="${MYSQL_HOSTDB%%/*}"
+    MYSQL_DB="${MYSQL_HOSTDB#*/}"
+
+    MYSQL_HOST="${MYSQL_HOSTPORT%%:*}"
+    MYSQL_PORT="${MYSQL_HOSTPORT#*:}"
+    if [ "${MYSQL_PORT}" = "${MYSQL_HOSTPORT}" ]; then
+        MYSQL_PORT="3306"
+    fi
+
+    DB_QUERY="${DB_QUERY:-loc=UTC&parseTime=false}"
+    DB_LINK="mysql:${MYSQL_USER}:${MYSQL_PASSWORD}@tcp(${MYSQL_HOST}:${MYSQL_PORT})/${MYSQL_DB}"
+    if [ -n "${DB_QUERY}" ]; then
+        DB_LINK="${DB_LINK}?${DB_QUERY}"
+    fi
+
+    set -- "$@" "--database-link=${DB_LINK}"
 elif [ -n "${DB_HOST:-}" ]; then
     DB_PORT="${DB_PORT:-3306}"
     DB_NAME="${DB_DATABASE:-unib}"
@@ -49,6 +73,30 @@ fi
 
 if [ -n "${REDIS_ADDRESS:-}" ]; then
     set -- "$@" "--redis-address=${REDIS_ADDRESS}"
+elif [ -n "${REDIS_URL:-}" ]; then
+    REDIS_TMP="${REDIS_URL#redis://}"
+    REDIS_CREDS="${REDIS_TMP%@*}"
+    REDIS_HOSTDB="${REDIS_TMP#*@}"
+
+    REDIS_USER="${REDIS_CREDS%%:*}"
+    REDIS_PASS_FROM_URL="${REDIS_CREDS#*:}"
+
+    REDIS_HOSTPORT="${REDIS_HOSTDB%%/*}"
+    REDIS_DB_FROM_URL="${REDIS_HOSTDB#*/}"
+
+    REDIS_HOST_FROM_URL="${REDIS_HOSTPORT%%:*}"
+    REDIS_PORT_FROM_URL="${REDIS_HOSTPORT#*:}"
+    if [ "${REDIS_PORT_FROM_URL}" = "${REDIS_HOSTPORT}" ]; then
+        REDIS_PORT_FROM_URL="6379"
+    fi
+
+    set -- "$@" "--redis-address=${REDIS_HOST_FROM_URL}:${REDIS_PORT_FROM_URL}"
+    if [ -n "${REDIS_PASS_FROM_URL}" ] && [ "${REDIS_PASS_FROM_URL}" != "${REDIS_USER}" ]; then
+        set -- "$@" "--redis-password=${REDIS_PASS_FROM_URL}"
+    fi
+    if [ -n "${REDIS_DB_FROM_URL}" ] && [ "${REDIS_DB_FROM_URL}" != "${REDIS_HOSTDB}" ]; then
+        set -- "$@" "--redis-database=${REDIS_DB_FROM_URL}"
+    fi
 elif [ -n "${REDIS_HOST:-}" ]; then
     REDIS_PORT="${REDIS_PORT:-6379}"
     set -- "$@" "--redis-address=${REDIS_HOST}:${REDIS_PORT}"
