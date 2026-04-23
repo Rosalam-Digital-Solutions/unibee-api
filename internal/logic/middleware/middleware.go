@@ -51,6 +51,11 @@ func (s *SMiddleware) CORS(r *ghttp.Request) {
 	g.Log().Debugf(r.Context(), "CORS Control: HTTP Header Referer:%s", r.GetHeader("Referer"))
 	g.Log().Debugf(r.Context(), "CORS Control: HTTP Header User-Agent:%s", r.GetHeader("User-Agent"))
 	r.Response.CORSDefault()
+	r.Response.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
+	r.Response.Header().Set("X-Frame-Options", "DENY")
+	r.Response.Header().Set("X-Content-Type-Options", "nosniff")
+	r.Response.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	r.Response.Header().Set("Content-Security-Policy", "default-src 'self'")
 	r.Middleware.Next()
 }
 
@@ -102,7 +107,7 @@ func (s *SMiddleware) ResponseHandler(r *ghttp.Request) {
 	if len(customCtx.UserAgent) > 0 && strings.Contains(customCtx.UserAgent, "OpenAPI") {
 		customCtx.IsOpenApiCall = true
 	}
-	g.Log().Info(r.Context(), fmt.Sprintf("[Request][%s][%s][%s][%s][%s] IsOpenApi:%v Token:%s Body:%s", customCtx.ClientIdentity, customCtx.RequestId, customCtx.Language, r.Method, r.GetUrl(), customCtx.IsOpenApiCall, customCtx.TokenString, r.GetBodyString()))
+	g.Log().Info(r.Context(), fmt.Sprintf("[Request][%s][%s][%s][%s][%s] IsOpenApi:%v Body:%s", customCtx.ClientIdentity, customCtx.RequestId, customCtx.Language, r.Method, r.GetUrl(), customCtx.IsOpenApiCall, r.GetBodyString()))
 
 	utility.Try(r.Middleware.Next, func(err interface{}) {
 		g.Log().Errorf(r.Context(), "[Request][%s][%s][%s][%s] Global_Exception Panic Body:%s Error:%v", customCtx.ClientIdentity, customCtx.RequestId, r.Method, r.GetUrl(), r.GetBodyString(), err)
@@ -185,7 +190,7 @@ func (s *SMiddleware) MerchantHandler(r *ghttp.Request) {
 		// Admin Portal Call
 		customCtx.IsAdminPortalCall = true
 		if !jwt.IsAuthTokenAvailable(r.Context(), customCtx.TokenString) {
-			g.Log().Infof(r.Context(), "MerchantHandler Invalid Token:%s", customCtx.TokenString)
+			g.Log().Infof(r.Context(), "MerchantHandler Invalid Token (redacted)")
 			_interface.JsonRedirectExit(r, 61, "invalid token", s.LoginUrl)
 			r.Exit()
 		}
@@ -350,7 +355,7 @@ func (s *SMiddleware) UserPortalApiHandler(r *ghttp.Request) {
 	if !customCtx.IsOpenApiCall {
 		// Merchant Portal Call
 		if !jwt.IsAuthTokenAvailable(r.Context(), customCtx.TokenString) {
-			g.Log().Infof(r.Context(), "MerchantHandler Invalid Token:%s", customCtx.TokenString)
+			g.Log().Infof(r.Context(), "MerchantHandler Invalid Token (redacted)")
 			_interface.JsonRedirectExit(r, 61, "invalid token", s.LoginUrl)
 			r.Exit()
 		}
