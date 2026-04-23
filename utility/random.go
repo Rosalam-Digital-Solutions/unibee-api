@@ -29,7 +29,7 @@ func GenerateRandomAlphanumeric(length int) string {
 	for i := range result {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
 		if err != nil {
-			panic(fmt.Sprintf("crypto/rand failed: %v", err))
+			panic(fmt.Sprintf("crypto/rand failed (system entropy exhausted?): %v", err))
 		}
 		result[i] = charset[n.Int64()]
 	}
@@ -99,7 +99,7 @@ func GenerateRandomCode(length int) string {
 	for i := range b {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
 		if err != nil {
-			panic(fmt.Sprintf("crypto/rand failed: %v", err))
+			panic(fmt.Sprintf("crypto/rand failed (system entropy exhausted?): %v", err))
 		}
 		b[i] = charset[n.Int64()]
 	}
@@ -109,7 +109,7 @@ func GenerateRandomCode(length int) string {
 func GenerateRandomNumber(length int) string {
 	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
 	if err != nil {
-		panic(fmt.Sprintf("crypto/rand failed: %v", err))
+		panic(fmt.Sprintf("crypto/rand failed (system entropy exhausted?): %v", err))
 	}
 	return fmt.Sprintf("%06v", n.Int64())
 }
