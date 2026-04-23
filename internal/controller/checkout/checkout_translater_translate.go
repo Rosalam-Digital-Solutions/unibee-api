@@ -25,6 +25,7 @@ func (c *ControllerTranslater) Translate(ctx context.Context, req *translater.Tr
 	const cacheTTLSeconds = 30 * 24 * 60 * 60
 	googleApiKey := os.Getenv("GOOGLE_TRANSLATE_API_KEY")
 	deepLApiKey := os.Getenv("DEEPL_API_KEY")
+	utility.Assert(len(googleApiKey) > 0 || len(deepLApiKey) > 0, "Translation service is not configured: set GOOGLE_TRANSLATE_API_KEY or DEEPL_API_KEY")
 
 	// Deduplicate while preserving input order
 	texts := make([]string, 0, len(req.Texts))

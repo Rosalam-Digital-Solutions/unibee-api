@@ -115,22 +115,20 @@ func GenerateRandomNumber(length int) string {
 }
 
 func GenerateRandomOpenApiKey(length int) (string, error) {
-	// Create a byte slice to hold the random bytes
-	key := make([]byte, length)
+	// We need enough raw bytes so that after base64 encoding the result is at
+	// least `length` characters long.  base64 expands by ~4/3, so reading
+	// ceil(length * 3 / 4) bytes is always sufficient.
+	rawLen := (length*3 + 3) / 4
+	key := make([]byte, rawLen)
 
-	// Read random bytes from crypto/rand into the byte slice
-	_, err := rand.Read(key)
-	if err != nil {
+	// Read cryptographically secure random bytes.
+	if _, err := rand.Read(key); err != nil {
 		return "", err
 	}
 
-	// Encode the random bytes to base64 to get a string representation
 	encodedKey := base64.URLEncoding.EncodeToString(key)
-
-	// Truncate the encoded string to the desired length
-	// (base64 encoding increases the length by approximately 33%)
 	if len(encodedKey) < length {
-		return encodedKey, nil
+		return "", fmt.Errorf("GenerateRandomOpenApiKey: encoded length %d is less than requested %d", len(encodedKey), length)
 	}
 	return encodedKey[:length], nil
 }

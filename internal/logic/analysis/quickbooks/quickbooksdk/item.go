@@ -160,7 +160,8 @@ func (c *Client) UpdateItem(item *Item) (*Item, error) {
 func (c *Client) FindOrCreateItem(ctx context.Context, name string, account *Account) (*Item, error) {
 	var item *Item
 	// Escape single quotes for the QuickBooks IQL query to prevent injection.
-	escapedName := strings.ReplaceAll(name, "'", "\\'")
+	// QuickBooks IQL uses doubled single quotes to escape them (like standard SQL).
+	escapedName := strings.ReplaceAll(name, "'", "''")
 	items, err := c.QueryItems(fmt.Sprintf("SELECT * FROM Item WHERE Name = '%s'", escapedName))
 	if err != nil {
 		g.Log().Errorf(ctx, "Error querying QuickBooks item '%s': %s.", name, err.Error())
