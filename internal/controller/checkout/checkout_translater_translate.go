@@ -3,6 +3,7 @@ package checkout
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"unibee/utility"
 
@@ -22,10 +23,8 @@ func (c *ControllerTranslater) Translate(ctx context.Context, req *translater.Tr
 	const defaultSourceLang = "en"
 	// Cache TTL: 30 days in seconds
 	const cacheTTLSeconds = 30 * 24 * 60 * 60
-	// TODO: Replace with real Google API Key (placeholder)
-	const googleApiKey = "REPLACE_ME_WITH_REAL_GOOGLE_API_KEY"
-	// TODO: Replace with real DeepL API Key (placeholder)
-	const deepLApiKey = "REPLACE_ME_WITH_REAL_DEEPL_API_KEY"
+	googleApiKey := os.Getenv("GOOGLE_TRANSLATE_API_KEY")
+	deepLApiKey := os.Getenv("DEEPL_API_KEY")
 
 	// Deduplicate while preserving input order
 	texts := make([]string, 0, len(req.Texts))

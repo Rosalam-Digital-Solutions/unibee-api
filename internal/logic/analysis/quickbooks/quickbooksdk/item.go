@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/gogf/gf/v2/frame/g"
 	"strconv"
+	"strings"
 )
 
 // Item represents a QuickBooks Item object (a product type).
@@ -158,7 +159,9 @@ func (c *Client) UpdateItem(item *Item) (*Item, error) {
 
 func (c *Client) FindOrCreateItem(ctx context.Context, name string, account *Account) (*Item, error) {
 	var item *Item
-	items, err := c.QueryItems(fmt.Sprintf("SELECT * FROM Item WHERE Name = '%s'", name))
+	// Escape single quotes for the QuickBooks IQL query to prevent injection.
+	escapedName := strings.ReplaceAll(name, "'", "\\'")
+	items, err := c.QueryItems(fmt.Sprintf("SELECT * FROM Item WHERE Name = '%s'", escapedName))
 	if err != nil {
 		g.Log().Errorf(ctx, "Error querying QuickBooks item '%s': %s.", name, err.Error())
 	} else if len(items) > 0 {

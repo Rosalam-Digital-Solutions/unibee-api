@@ -10,7 +10,7 @@ func PasswordEncrypt(pwd string) string {
 	if len(pwd) == 0 {
 		return ""
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.MinCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)
 	if err != nil {
 		log.Println(err)
 	}

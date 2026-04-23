@@ -1,10 +1,11 @@
 package utility
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"github.com/gogf/gf/v2/os/gtime"
-	"math/rand"
+	"math/big"
 	"runtime"
 	"time"
 )
@@ -23,11 +24,14 @@ func CurrentTimeMillis() (s int64) {
 }
 
 func GenerateRandomAlphanumeric(length int) string {
-	//rand.Seed(time.Now().UnixNano())
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	result := make([]byte, length)
 	for i := range result {
-		result[i] = charset[rand.Intn(len(charset))]
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			panic(fmt.Sprintf("crypto/rand failed: %v", err))
+		}
+		result[i] = charset[n.Int64()]
 	}
 	return string(result)
 }
@@ -53,18 +57,15 @@ func CreateRequestId() string {
 }
 
 func CreateCreditRechargeId() string {
-	//return fmt.Sprintf("iv%s%s", JodaTimePrefix(), GenerateRandomAlphanumeric(15))
-	return fmt.Sprintf("crrecharge%d%03v", gtime.Now().Timestamp(), rand.New(rand.NewSource(time.Now().UnixNano())).Int31n(1000))
+	return fmt.Sprintf("crrecharge%d%s", gtime.Now().Timestamp(), GenerateRandomAlphanumeric(8))
 }
 
 func CreateCreditPaymentId() string {
-	//return fmt.Sprintf("iv%s%s", JodaTimePrefix(), GenerateRandomAlphanumeric(15))
-	return fmt.Sprintf("crpayment%d%03v", gtime.Now().Timestamp(), rand.New(rand.NewSource(time.Now().UnixNano())).Int31n(1000))
+	return fmt.Sprintf("crpayment%d%s", gtime.Now().Timestamp(), GenerateRandomAlphanumeric(8))
 }
 
 func CreateCreditRefundId() string {
-	//return fmt.Sprintf("iv%s%s", JodaTimePrefix(), GenerateRandomAlphanumeric(15))
-	return fmt.Sprintf("crrefund%d%03v", gtime.Now().Timestamp(), rand.New(rand.NewSource(time.Now().UnixNano())).Int31n(1000))
+	return fmt.Sprintf("crrefund%d%s", gtime.Now().Timestamp(), GenerateRandomAlphanumeric(8))
 }
 
 func CreateSubscriptionId() string {
@@ -72,8 +73,7 @@ func CreateSubscriptionId() string {
 }
 
 func CreateInvoiceId() string {
-	//return fmt.Sprintf("iv%s%s", JodaTimePrefix(), GenerateRandomAlphanumeric(15))
-	return fmt.Sprintf("8%d%03v", gtime.Now().Timestamp(), rand.New(rand.NewSource(time.Now().UnixNano())).Int31n(1000))
+	return fmt.Sprintf("8%d%s", gtime.Now().Timestamp(), GenerateRandomAlphanumeric(8))
 }
 
 func CreateInvoiceSt() string {
@@ -94,18 +94,24 @@ func CreateRefundId() string {
 
 const charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
-var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
-
 func GenerateRandomCode(length int) string {
 	b := make([]byte, length)
 	for i := range b {
-		b[i] = charset[seededRand.Intn(len(charset))]
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			panic(fmt.Sprintf("crypto/rand failed: %v", err))
+		}
+		b[i] = charset[n.Int64()]
 	}
 	return string(b)
 }
 
 func GenerateRandomNumber(length int) string {
-	return fmt.Sprintf("%06v", rand.New(rand.NewSource(time.Now().UnixNano())).Int31n(1000000))
+	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		panic(fmt.Sprintf("crypto/rand failed: %v", err))
+	}
+	return fmt.Sprintf("%06v", n.Int64())
 }
 
 func GenerateRandomOpenApiKey(length int) (string, error) {
@@ -123,6 +129,9 @@ func GenerateRandomOpenApiKey(length int) (string, error) {
 
 	// Truncate the encoded string to the desired length
 	// (base64 encoding increases the length by approximately 33%)
+	if len(encodedKey) < length {
+		return encodedKey, nil
+	}
 	return encodedKey[:length], nil
 }
 
