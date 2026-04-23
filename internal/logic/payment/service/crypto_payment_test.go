@@ -1,4 +1,4 @@
-package service
+package service_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"unibee/api/bean"
 	"unibee/internal/consts"
 	"unibee/internal/logic/gateway/gateway_bean"
+	"unibee/internal/logic/payment/service"
 	entity "unibee/internal/model/entity/default"
 	"unibee/internal/query"
 	"unibee/test"
@@ -20,7 +21,7 @@ func TestCryptoPayment(t *testing.T) {
 	var err error
 	gateway := test.TestCryptoGateway
 	t.Run("Test for crypto payment checkout_new|cancel", func(t *testing.T) {
-		res, err := GatewayPaymentCreate(ctx, &gateway_bean.GatewayNewPaymentReq{
+		res, err := service.GatewayPaymentCreate(ctx, &gateway_bean.GatewayNewPaymentReq{
 			CheckoutMode: true,
 			Pay: &entity.Payment{
 				ExternalPaymentId: uuid.New().String(),
@@ -61,20 +62,20 @@ func TestCryptoPayment(t *testing.T) {
 		require.Equal(t, true, len(one.InvoiceId) > 0)
 		require.Equal(t, true, len(one.CryptoCurrency) > 0)
 		require.Equal(t, true, one.CryptoAmount > 0)
-		err = PaymentGatewayCancel(ctx, one)
+		err = service.PaymentGatewayCancel(ctx, one)
 		require.Nil(t, err)
 		one = query.GetPaymentByPaymentId(ctx, paymentId)
 		require.NotNil(t, one)
 		require.Equal(t, true, one.Status == consts.PaymentCancelled)
 	})
 	t.Run("Test for crypto payment HardDelete", func(t *testing.T) {
-		err = HardDeletePayment(ctx, test.TestMerchant.Id, paymentId)
+		err = service.HardDeletePayment(ctx, test.TestMerchant.Id, paymentId)
 		require.Nil(t, err)
 	})
 
 	var refundId string
 	t.Run("Test for crypto payment automatic|refund", func(t *testing.T) {
-		res, err := GatewayPaymentCreate(ctx, &gateway_bean.GatewayNewPaymentReq{
+		res, err := service.GatewayPaymentCreate(ctx, &gateway_bean.GatewayNewPaymentReq{
 			CheckoutMode: false,
 			Pay: &entity.Payment{
 				ExternalPaymentId: uuid.New().String(),
@@ -112,9 +113,9 @@ func TestCryptoPayment(t *testing.T) {
 		require.NotNil(t, one)
 		require.Equal(t, "USD", one.Currency)
 		require.Equal(t, int64(100), one.TotalAmount)
-		err = PaymentGatewayCancel(ctx, one)
+		err = service.PaymentGatewayCancel(ctx, one)
 		require.NotNil(t, err)
-		refundRes, err := GatewayPaymentRefundCreate(ctx, &NewPaymentRefundInternalReq{
+		refundRes, err := service.GatewayPaymentRefundCreate(ctx, &service.NewPaymentRefundInternalReq{
 			PaymentId:        one.PaymentId,
 			ExternalRefundId: uuid.New().String(),
 			RefundAmount:     100,
@@ -128,11 +129,11 @@ func TestCryptoPayment(t *testing.T) {
 		require.NotNil(t, refund)
 		require.Equal(t, true, refund.Status == consts.RefundCreated)
 		require.Equal(t, consts.RefundTypeMarked, refund.Type)
-		err = PaymentRefundGatewayCancel(ctx, refund)
+		err = service.PaymentRefundGatewayCancel(ctx, refund)
 		require.Nil(t, err)
-		err = HardDeleteRefund(ctx, test.TestMerchant.Id, refundId)
+		err = service.HardDeleteRefund(ctx, test.TestMerchant.Id, refundId)
 		require.Nil(t, err)
-		refundRes, err = MarkPaymentRefundCreate(ctx, &NewPaymentRefundInternalReq{
+		refundRes, err = service.MarkPaymentRefundCreate(ctx, &service.NewPaymentRefundInternalReq{
 			PaymentId:        one.PaymentId,
 			ExternalRefundId: uuid.New().String(),
 			RefundAmount:     100,
@@ -148,9 +149,9 @@ func TestCryptoPayment(t *testing.T) {
 		require.Equal(t, 2, refund.Type)
 	})
 	t.Run("Test for crypto payment HardDelete", func(t *testing.T) {
-		err = HardDeletePayment(ctx, test.TestMerchant.Id, paymentId)
+		err = service.HardDeletePayment(ctx, test.TestMerchant.Id, paymentId)
 		require.Nil(t, err)
-		err = HardDeleteRefund(ctx, test.TestMerchant.Id, refundId)
+		err = service.HardDeleteRefund(ctx, test.TestMerchant.Id, refundId)
 		require.Nil(t, err)
 	})
 }

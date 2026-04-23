@@ -1,4 +1,4 @@
-package service
+package service_test
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"unibee/internal/logic/gateway/gateway_bean"
 	"unibee/internal/logic/invoice/invoice_compute"
 	"unibee/internal/logic/payment/link"
+	"unibee/internal/logic/payment/service"
 	entity "unibee/internal/model/entity/default"
 	"unibee/internal/query"
 	"unibee/test"
@@ -23,7 +24,7 @@ func TestPayment(t *testing.T) {
 	var err error
 	gateway := test.TestGateway
 	t.Run("Test for payment checkout_new｜link|cancel", func(t *testing.T) {
-		res, err := GatewayPaymentCreate(ctx, &gateway_bean.GatewayNewPaymentReq{
+		res, err := service.GatewayPaymentCreate(ctx, &gateway_bean.GatewayNewPaymentReq{
 			CheckoutMode: true,
 			Pay: &entity.Payment{
 				ExternalPaymentId: uuid.New().String(),
@@ -81,7 +82,7 @@ func TestPayment(t *testing.T) {
 		require.NotNil(t, checkRes)
 		require.Equal(t, true, len(checkRes.Link) == 0)
 		require.Equal(t, true, len(checkRes.Message) > 0)
-		err = PaymentGatewayCancel(ctx, one)
+		err = service.PaymentGatewayCancel(ctx, one)
 		require.Nil(t, err)
 		checkRes = link.LinkCheck(ctx, one.PaymentId, gtime.Now().Timestamp())
 		require.NotNil(t, checkRes)
@@ -90,7 +91,7 @@ func TestPayment(t *testing.T) {
 		one = query.GetPaymentByPaymentId(ctx, paymentId)
 		require.NotNil(t, one)
 		require.Equal(t, true, one.Status == consts.PaymentCancelled)
-		list, _, err := PaymentList(ctx, &PaymentListInternalReq{
+		list, _, err := service.PaymentList(ctx, &service.PaymentListInternalReq{
 			MerchantId: test.TestMerchant.Id,
 			GatewayId:  gateway.Id,
 			UserId:     test.TestUser.Id,
@@ -101,13 +102,13 @@ func TestPayment(t *testing.T) {
 		require.Equal(t, true, len(list) > 0)
 	})
 	t.Run("Test for payment HardDelete", func(t *testing.T) {
-		err = HardDeletePayment(ctx, test.TestMerchant.Id, paymentId)
+		err = service.HardDeletePayment(ctx, test.TestMerchant.Id, paymentId)
 		require.Nil(t, err)
 	})
 
 	var refundId string
 	t.Run("Test for payment automatic|refund", func(t *testing.T) {
-		res, err := GatewayPaymentCreate(ctx, &gateway_bean.GatewayNewPaymentReq{
+		res, err := service.GatewayPaymentCreate(ctx, &gateway_bean.GatewayNewPaymentReq{
 			CheckoutMode: false,
 			Pay: &entity.Payment{
 				ExternalPaymentId: uuid.New().String(),
@@ -145,9 +146,9 @@ func TestPayment(t *testing.T) {
 		require.NotNil(t, one)
 		require.Equal(t, "USD", one.Currency)
 		require.Equal(t, int64(100), one.TotalAmount)
-		err = PaymentGatewayCancel(ctx, one)
+		err = service.PaymentGatewayCancel(ctx, one)
 		require.NotNil(t, err)
-		refundRes, err := GatewayPaymentRefundCreate(ctx, &NewPaymentRefundInternalReq{
+		refundRes, err := service.GatewayPaymentRefundCreate(ctx, &service.NewPaymentRefundInternalReq{
 			PaymentId:        one.PaymentId,
 			ExternalRefundId: uuid.New().String(),
 			RefundAmount:     100,
@@ -161,7 +162,7 @@ func TestPayment(t *testing.T) {
 		require.NotNil(t, refund)
 		require.Equal(t, true, refund.Status == consts.RefundSuccess)
 		require.Equal(t, consts.RefundTypeMarked, refund.Type)
-		list, _, err := RefundList(ctx, &RefundListInternalReq{
+		list, _, err := service.RefundList(ctx, &service.RefundListInternalReq{
 			MerchantId: test.TestMerchant.Id,
 			PaymentId:  refund.PaymentId,
 			GatewayId:  gateway.Id,
@@ -174,9 +175,9 @@ func TestPayment(t *testing.T) {
 		require.Equal(t, 1, len(list))
 	})
 	t.Run("Test for payment HardDelete", func(t *testing.T) {
-		err = HardDeletePayment(ctx, test.TestMerchant.Id, paymentId)
+		err = service.HardDeletePayment(ctx, test.TestMerchant.Id, paymentId)
 		require.Nil(t, err)
-		err = HardDeleteRefund(ctx, test.TestMerchant.Id, refundId)
+		err = service.HardDeleteRefund(ctx, test.TestMerchant.Id, refundId)
 		require.Nil(t, err)
 	})
 }

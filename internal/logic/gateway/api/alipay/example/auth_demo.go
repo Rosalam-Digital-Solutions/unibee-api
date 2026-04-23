@@ -1,12 +1,16 @@
+//go:build ignore
+// +build ignore
+
 package main
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	defaultAlipayClient "unibee/internal/logic/gateway/api/alipay/api"
 	"unibee/internal/logic/gateway/api/alipay/api/model"
 	"unibee/internal/logic/gateway/api/alipay/api/request/auth"
 	responseAuth "unibee/internal/logic/gateway/api/alipay/api/response/auth"
+
+	"github.com/google/uuid"
 )
 
 func main() {
