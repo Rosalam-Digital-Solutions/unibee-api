@@ -373,7 +373,7 @@ func setUpDefaultConfig(config map[string]interface{}, key string, flagValue int
 
 func inferDatabaseType(link string) string {
 	l := strings.ToLower(link)
-	if strings.HasPrefix(l, "postgres://") || strings.HasPrefix(l, "postgresql://") || strings.Contains(l, "@tcp(") == false && strings.Contains(l, "host=") {
+	if strings.HasPrefix(l, "postgres://") || strings.HasPrefix(l, "postgresql://") || strings.HasPrefix(l, "postgres:") || strings.Contains(l, "postgresql@") || strings.Contains(l, "pgsql") {
 		return "pgsql"
 	}
 	return "mysql"
