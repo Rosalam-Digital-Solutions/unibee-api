@@ -61,6 +61,19 @@ func GetMerchantByHost(ctx context.Context, host string) (one *entity.Merchant) 
 	return one
 }
 
+func GetMerchantByEmail(ctx context.Context, email string) (one *entity.Merchant) {
+	if len(email) == 0 {
+		return nil
+	}
+	err := dao.Merchant.Ctx(ctx).
+		Where(dao.Merchant.Columns().Email, email).
+		Scan(&one)
+	if err != nil {
+		return nil
+	}
+	return one
+}
+
 func GetMerchantList(ctx context.Context) (list []*entity.Merchant, err error) {
 	err = dao.Merchant.Ctx(ctx).
 		Scan(&list)

@@ -126,27 +126,28 @@ func CreateMerchant(ctx context.Context, req *CreateMerchantInternalReq) (*entit
 	}
 	// transaction create Merchant
 	err := dao.Merchant.DB().Transaction(ctx, func(ctx context.Context, transaction gdb.TX) error {
-		insert, err := dao.Merchant.Ctx(ctx).Data(merchant).OmitNil().Insert(merchant)
+		var err error
+		_, err = dao.Merchant.Ctx(ctx).Data(merchant).OmitNil().Insert()
 		if err != nil {
 			return err
 		}
-		merchantId, err := insert.LastInsertId()
-		if err != nil {
-			return err
+		newMerchant := query.GetMerchantByEmail(ctx, merchant.Email)
+		if newMerchant == nil {
+			return fmt.Errorf("failed to retrieve created merchant")
 		}
-		merchant.Id = uint64(merchantId)
+		merchant.Id = newMerchant.Id
 		merchantMasterMember.MerchantId = merchant.Id
 
-		insert, err = dao.MerchantMember.Ctx(ctx).Data(merchantMasterMember).OmitNil().Insert(merchantMasterMember)
+		_, err = dao.MerchantMember.Ctx(ctx).Data(merchantMasterMember).OmitNil().Insert()
 		if err != nil {
 			return err
 		}
-		id, err := insert.LastInsertId()
-		if err != nil {
-			return err
+		newMember := query.GetMerchantMemberByEmail(ctx, merchantMasterMember.Email)
+		if newMember == nil {
+			return fmt.Errorf("failed to retrieve created member")
 		}
-		merchantMasterMember.Id = uint64(id)
-		merchant.UserId = id
+		merchantMasterMember.Id = newMember.Id
+		merchant.UserId = int64(newMember.Id)
 
 		// bind merchantMemberAccount
 		_, err = dao.Merchant.Ctx(ctx).Data(g.Map{
