@@ -40,7 +40,7 @@ func (c *ControllerTask) EditTemplate(ctx context.Context, req *task.EditTemplat
 		dao.MerchantBatchExportTemplate.Columns().Payload:       payload,
 		dao.MerchantBatchExportTemplate.Columns().ExportColumns: exportColumns,
 		dao.MerchantBatchExportTemplate.Columns().GmtModify:     gtime.Now(),
-	}).Where(dao.MerchantBatchExportTemplate.Columns().Id, one.Id).Where(dao.MerchantWebhook.Columns().IsDeleted, 0).OmitNil().Update()
+	}).Where(dao.MerchantBatchExportTemplate.Columns().Id, one.Id).Where(dao.MerchantBatchExportTemplate.Columns().IsDeleted, 0).OmitNil().Update()
 	if err != nil {
 		return nil, err
 	}

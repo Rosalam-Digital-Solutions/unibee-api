@@ -121,6 +121,158 @@ func StandAloneInit(ctx context.Context) {
 		}
 		glog.Infof(ctx, "StandAloneInit DBUpgrade end")
 	}
+	ensureLocalCreditTransactionTable(ctx)
+	ensureLocalMerchantBatchExportTemplateTable(ctx)
+}
+
+func ensureLocalCreditTransactionTable(ctx context.Context) {
+	database, err := gdb.Instance()
+	if err != nil {
+		glog.Errorf(ctx, "StandAloneInit ensure credit_transaction Get Database Instance error:%v", err)
+		return
+	}
+
+	dbType := database.GetConfig().Type
+	var createSQL string
+	switch dbType {
+	case "pgsql", "postgres":
+		createSQL = `
+CREATE TABLE IF NOT EXISTS credit_transaction (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL DEFAULT 0,
+  credit_id BIGINT NOT NULL DEFAULT 0,
+  currency VARCHAR(64) NOT NULL DEFAULT '',
+  transaction_id VARCHAR(128) NOT NULL DEFAULT '',
+  transaction_type INTEGER NOT NULL DEFAULT 0,
+  credit_amount_after BIGINT NOT NULL DEFAULT 0,
+  credit_amount_before BIGINT NOT NULL DEFAULT 0,
+  delta_amount BIGINT NOT NULL DEFAULT 0,
+  biz_id VARCHAR(128) NOT NULL DEFAULT '',
+  name VARCHAR(256) NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  gmt_create TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  gmt_modify TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  create_time BIGINT NOT NULL DEFAULT 0,
+  merchant_id BIGINT NOT NULL DEFAULT 0,
+  invoice_id VARCHAR(128) NOT NULL DEFAULT '',
+  account_type INTEGER NOT NULL DEFAULT 0,
+  admin_member_id BIGINT NOT NULL DEFAULT 0,
+  exchange_rate BIGINT NOT NULL DEFAULT 0
+)`
+	case "mysql":
+		createSQL = `
+CREATE TABLE IF NOT EXISTS credit_transaction (
+  id bigint NOT NULL AUTO_INCREMENT,
+  user_id bigint unsigned NOT NULL DEFAULT 0,
+  credit_id bigint unsigned NOT NULL DEFAULT 0,
+  currency varchar(64) NOT NULL DEFAULT '',
+  transaction_id varchar(128) NOT NULL DEFAULT '',
+  transaction_type int NOT NULL DEFAULT 0,
+  credit_amount_after bigint NOT NULL DEFAULT 0,
+  credit_amount_before bigint NOT NULL DEFAULT 0,
+  delta_amount bigint NOT NULL DEFAULT 0,
+  biz_id varchar(128) NOT NULL DEFAULT '',
+  name varchar(256) NOT NULL DEFAULT '',
+  description text NOT NULL,
+  gmt_create datetime DEFAULT CURRENT_TIMESTAMP,
+  gmt_modify datetime DEFAULT CURRENT_TIMESTAMP,
+  create_time bigint NOT NULL DEFAULT 0,
+  merchant_id bigint unsigned NOT NULL DEFAULT 0,
+  invoice_id varchar(128) NOT NULL DEFAULT '',
+  account_type int NOT NULL DEFAULT 0,
+  admin_member_id bigint unsigned NOT NULL DEFAULT 0,
+  exchange_rate bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+	default:
+		glog.Infof(ctx, "StandAloneInit ensure credit_transaction skipped for database type:%s", dbType)
+		return
+	}
+
+	if _, err = database.Exec(ctx, createSQL); err != nil {
+		glog.Errorf(ctx, "StandAloneInit ensure credit_transaction create table error:%v", err)
+		return
+	}
+
+	if dbType == "pgsql" || dbType == "postgres" {
+		indexSQLList := []string{
+			`CREATE INDEX IF NOT EXISTS idx_credit_transaction_merchant_account ON credit_transaction (merchant_id, account_type)`,
+			`CREATE INDEX IF NOT EXISTS idx_credit_transaction_credit_id ON credit_transaction (credit_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_credit_transaction_invoice_id ON credit_transaction (invoice_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_credit_transaction_transaction_id ON credit_transaction (transaction_id)`,
+		}
+		for _, indexSQL := range indexSQLList {
+			if _, err = database.Exec(ctx, indexSQL); err != nil {
+				glog.Errorf(ctx, "StandAloneInit ensure credit_transaction index error:%v", err)
+			}
+		}
+	}
+}
+
+func ensureLocalMerchantBatchExportTemplateTable(ctx context.Context) {
+	database, err := gdb.Instance()
+	if err != nil {
+		glog.Errorf(ctx, "StandAloneInit ensure merchant_batch_export_template Get Database Instance error:%v", err)
+		return
+	}
+
+	dbType := database.GetConfig().Type
+	var createSQL string
+	switch dbType {
+	case "pgsql", "postgres":
+		createSQL = `
+CREATE TABLE IF NOT EXISTS merchant_batch_export_template (
+  id BIGSERIAL PRIMARY KEY,
+  merchant_id BIGINT NOT NULL DEFAULT 0,
+  member_id BIGINT NOT NULL DEFAULT 0,
+  name VARCHAR(256) NOT NULL DEFAULT '',
+  task VARCHAR(128) NOT NULL DEFAULT '',
+  format VARCHAR(32) NOT NULL DEFAULT '',
+  payload TEXT NOT NULL DEFAULT '',
+  export_columns TEXT NOT NULL DEFAULT '',
+  is_deleted INTEGER NOT NULL DEFAULT 0,
+  gmt_create TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  gmt_modify TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  create_time BIGINT NOT NULL DEFAULT 0
+)`
+	case "mysql":
+		createSQL = `
+CREATE TABLE IF NOT EXISTS merchant_batch_export_template (
+  id bigint unsigned NOT NULL AUTO_INCREMENT,
+  merchant_id bigint unsigned NOT NULL DEFAULT 0,
+  member_id bigint unsigned NOT NULL DEFAULT 0,
+  name varchar(256) NOT NULL DEFAULT '',
+  task varchar(128) NOT NULL DEFAULT '',
+  format varchar(32) NOT NULL DEFAULT '',
+  payload text NOT NULL,
+  export_columns text NOT NULL,
+  is_deleted int NOT NULL DEFAULT 0,
+  gmt_create datetime DEFAULT CURRENT_TIMESTAMP,
+  gmt_modify datetime DEFAULT CURRENT_TIMESTAMP,
+  create_time bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+	default:
+		glog.Infof(ctx, "StandAloneInit ensure merchant_batch_export_template skipped for database type:%s", dbType)
+		return
+	}
+
+	if _, err = database.Exec(ctx, createSQL); err != nil {
+		glog.Errorf(ctx, "StandAloneInit ensure merchant_batch_export_template create table error:%v", err)
+		return
+	}
+
+	if dbType == "pgsql" || dbType == "postgres" {
+		indexSQLList := []string{
+			`CREATE INDEX IF NOT EXISTS idx_merchant_batch_export_template_member ON merchant_batch_export_template (merchant_id, member_id, is_deleted)`,
+			`CREATE INDEX IF NOT EXISTS idx_merchant_batch_export_template_task ON merchant_batch_export_template (task)`,
+		}
+		for _, indexSQL := range indexSQLList {
+			if _, err = database.Exec(ctx, indexSQL); err != nil {
+				glog.Errorf(ctx, "StandAloneInit ensure merchant_batch_export_template index error:%v", err)
+			}
+		}
+	}
 }
 
 func GetUpgradeList(ctx context.Context) (list []*entity.TableUpgradeHistory) {

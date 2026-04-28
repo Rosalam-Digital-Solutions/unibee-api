@@ -29,7 +29,7 @@ func (c *ControllerTask) DeleteTemplate(ctx context.Context, req *task.DeleteTem
 	_, err = dao.MerchantBatchExportTemplate.Ctx(ctx).Data(g.Map{
 		dao.MerchantBatchExportTemplate.Columns().IsDeleted: 1,
 		dao.MerchantBatchExportTemplate.Columns().GmtModify: gtime.Now(),
-	}).Where(dao.MerchantBatchExportTemplate.Columns().Id, one.Id).Where(dao.MerchantWebhook.Columns().IsDeleted, 0).OmitNil().Update()
+	}).Where(dao.MerchantBatchExportTemplate.Columns().Id, one.Id).Where(dao.MerchantBatchExportTemplate.Columns().IsDeleted, 0).OmitNil().Update()
 	if err != nil {
 		return nil, err
 	}
